@@ -1,0 +1,26 @@
+IMPLEMENT
+(note: anything that has <> at end, is a specific tag)
+Parsing
+  > Basic Data types
+  > Common records
+  > Tags
+Functionality
+  > character dictionary
+  > display list
+    |> depth ordering
+    |> clipping
+  > rendering
+    |> filters
+  > events???
+  > frame labels
+  > Protection, uuuh, bad news YARRR
+  > Export - Import
+  > Debugging
+  > ScriptLimits<>
+  > Actions - the stack machine
+    |> SWF 4 
+    |> SWF 5 Action Script
+    |> SWF 6
+    |> SWF 7
+    |> SWF 9 AS3 AVM2
+  > Shapes
