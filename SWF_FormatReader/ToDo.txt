@@ -4,6 +4,7 @@ Parsing
   > Basic Data types
   > Common records
   > Tags
+(not the file reader's thing perhaps?)
 Functionality
   > character dictionary
   > display list
