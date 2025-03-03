@@ -10,7 +10,16 @@ class Tag{
 class READER{
   static hello(){console.log("hello, testing complete..."); console.error("THERE ARE ALWAYS ERRORS");}
   static read(file){
-  
+    let fr = new FileReader();
+    fr.readAsArrayBuffer(file);
+    return new Promise((resolve, reject)=>{
+      fr.onload = ()=>{
+        resolve(fr.result);
+      }
+      fr.onerror = (error)=>{
+        reject(error);
+      }
+    });
   }
 }
 //STOP, don't implement yet >:(
