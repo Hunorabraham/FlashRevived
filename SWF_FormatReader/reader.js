@@ -17,12 +17,12 @@ class READER{
         const byteView = new Uint8Array(fr.result);
         switch(byteView[0]){
           case 83: // S - uncompressed
-            resolve(byteView);
+            resolve({"data":byteView.slice(8), "version": byteView[3]});
             break;
           case 67: // C - ZLIB compression
-            resolve(READER.ZLIB_Decompress(byteView));
+            resolve({"data":READER.ZLIB_Decompress(byteView), "version": byteView[3]});
             break;
-          case 90: // 
+          case 90: // Z - the newer compression type I'm not brave enough to tackle right now
             reject("Not yet implemented");
             break;
           default:
@@ -35,13 +35,15 @@ class READER{
       }
     });
   }
-  static ZLIB_Decompress(buffer){
-    const header = buffer.slice(0,8);
-    const decompression_target = new Blob(buffer.slice(8));
-    const ds = new DecompressionStream("deflate");
-    const decompressed_body = decompression_target.stream().pipeThrough(ds);
-    const a = header.concat(buffer);
-    return buffer;
+  static async ZLIB_Decompress(buffer){
+    const decompression_target = new Blob(buffer);
+    console.log(buffer);
+    const ds = new DecompressionStream("deflate-raw");
+    const decompressed_stream = decompression_target.stream().pipeThrough(ds);
+    let destination_array = [];
+    for await (const chunk of decompressed_stream){
+        destination_array.push(chunk);
+    }
+    return destination_array;
   }
 }
-//STOP, don't implement yet >:(
