@@ -1,0 +1,2 @@
+HFP: Horrible Flash Player
+gets a ArrayBuffer containing the decompressed file

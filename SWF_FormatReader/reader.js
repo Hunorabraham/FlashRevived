@@ -14,12 +14,29 @@ class READER{
     fr.readAsArrayBuffer(file);
     return new Promise((resolve, reject)=>{
       fr.onload = ()=>{
-        resolve(fr.result);
+        const byteView = new Uint8Array(fr.result);
+        switch(byteView[0]){
+          case 83: // S - uncompressed
+            resolve(byteView);
+            break;
+          case 67: // C - ZLIB compression
+            resolve(READER.ZLIB_Decompress(byteView));
+            break;
+          case 90: // 
+            reject("Not yet implemented");
+            break;
+          default:
+            reject("Unrecognised signature: " + byteView[0]);
+            break;
+        }
       }
       fr.onerror = (error)=>{
         reject(error);
       }
     });
+  }
+  static ZLIB_Decompress(buffer){
+    return "Uh oh";
   }
 }
 //STOP, don't implement yet >:(
