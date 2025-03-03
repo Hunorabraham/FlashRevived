@@ -1,0 +1,13 @@
+Main goal: run swf games/movies
+Begining: swf file
+<reader.js>
+  v check file type
+  v load file contents
+  v decompress
+<HFP.js>
+  v check version
+  v run file
+    > parsing
+    > virtualisation
+    > functionality
+    > API
