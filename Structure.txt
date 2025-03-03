@@ -3,6 +3,8 @@ Begining: swf file
 <reader.js>
   v check file type
   v load file contents
+  v interpret swf header
+    > compression algorithm
   v decompress
 <HFP.js>
   v check version

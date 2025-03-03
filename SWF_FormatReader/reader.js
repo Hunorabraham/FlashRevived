@@ -36,7 +36,12 @@ class READER{
     });
   }
   static ZLIB_Decompress(buffer){
-    return "Uh oh";
+    const header = buffer.slice(0,8);
+    const decompression_target = new Blob(buffer.slice(8));
+    const ds = new DecompressionStream("deflate");
+    const decompressed_body = decompression_target.stream().pipeThrough(ds);
+    const a = header.concat(buffer);
+    return buffer;
   }
 }
 //STOP, don't implement yet >:(

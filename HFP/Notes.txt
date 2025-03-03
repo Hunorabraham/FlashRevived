@@ -1,2 +1,3 @@
 HFP: Horrible Flash Player
 gets a ArrayBuffer containing the decompressed file
+this will handle parsing of tags, refer to Notes in SWF_FormatReader
