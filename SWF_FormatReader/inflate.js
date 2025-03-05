@@ -8,6 +8,8 @@ class ZLIB_DECODER{
     this.reading_position = 0;
     this.error_message = "";
     this.result = new Uint8Array(new ArrayBuffer(size_hint));
+    this.last = false;
+    this.window_width = 0;
   }
   inflate(){
     while(true){
@@ -19,13 +21,43 @@ class ZLIB_DECODER{
         this.error_message = "incorrect header check";
         return "ERR";
       }
-      
-      this.mode = "TESTNEXT";
+      if(this.BITS(4) !== 8){//deflate encoding
+        this.error_message = "unknown compression method";
+        return "ERR";
+      }
+      this.CONSUMEBITS(4);
+      this.window_width = this.BITS(4)+8;
+      if(len > 15){
+        this.error_message = "invalid window size: " + this.window_width;
+        return "ERR";
+      }
+      this.mode = (this.hold & 0x200) !== 0 ? "DICTID" : "TYPE";
+      this.CLEARACCUMULATOR();
       break;//HEAD
+    case "DICTID":
+      this.error_message = "use of external dict is not supported"
+      return "ERR";
+    case "TYPE":
+      if(this.last){
+        this.ALINGTOBYTE();
+        this.mode = "CHECK";
+        break;
+      }
+      this.GETBITS(3);
+      this.last = BITS(1);
+      this.CONSUMEBITS(1);
+      //this might need a bit more elbow grease
+      switch(BITS(2)){
+        //stored
+        case 0:
+          this.mode = stored;
+          break;
+      }
+      return "ERR";
+      break;
     default:
       this.error_message = "Not implemented yet/unexpected mode: " + this.mode;
       return "ERR";
-      break;
     }//switch
     }//while
   }
@@ -47,6 +79,18 @@ class ZLIB_DECODER{
     this.hold += this.data[this.reading_position++] << this.bits;
     this.bits += 8;
     return "OK";
+  }
+  CONSUMEBITS(n){
+    this.hold >>= n;
+    this.bits -= n;
+  }
+  ALIGNTOBYTE(){
+    this.hold >>= this.bits & 7;
+    this.bits -= this.bits & 7;
+  }
+  CLEARACCUMULATOR(){
+    this.hold = 0;
+    this.bits = 0;
   }
 }
 
