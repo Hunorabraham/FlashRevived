@@ -1,4 +1,5 @@
 file read
 
 ZLIB
-  > js has me covered baby!
+  > js has me covered baby! - LIES!!!
+  > Do RFC 1950
