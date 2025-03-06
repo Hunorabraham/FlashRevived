@@ -1,7 +1,7 @@
 let file_in = document.querySelector("input");
 file_in.onchange = (e)=>{
     let file = e.target.files[0];
-    //console.log(file);
+    console.log(file);
     if(!file){
         console.error("What? There is no file?");
         return;
@@ -10,11 +10,4 @@ file_in.onchange = (e)=>{
         console.error("WOHA there pal, that is not a shockwafe flash file!");
         return;
     }
-    READER.read(file)
-    .then((data)=>{
-      console.log(data);
-    })
-    .catch((e)=>{
-      console.error(e);
-    });
 }
