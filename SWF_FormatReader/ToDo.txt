@@ -11,4 +11,4 @@ Parsing (perhaps this is done in HFP)
 Roadmap:
   > file read :)
   > uncompress
-    > ZLIB
+    > ZLIB :|
