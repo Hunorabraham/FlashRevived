@@ -53,9 +53,18 @@ class ZLIB_DECODER{
         case 0:
           this.mode = "STORED";
           break;
+        case 1:
+          this.fixedTables();
+          this.mode = "LEN";
+          break;
+        case 2:
+          this.mode = "TABLE";
+          break;
+        case 3:
+          this.error_message = "invalid block type";
+          return "ERR";
       }
-      
-      return "ERR";
+      this.CONSUMEBITS(2);
       break;
     default:
       this.error_message = "Not implemented yet/unexpected mode: " + this.mode;
