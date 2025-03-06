@@ -27,12 +27,13 @@ class ZLIB_DECODER{
       }
       this.CONSUMEBITS(4);
       this.window_width = this.BITS(4)+8;
-      if(len > 15){
+      if(this.window_width > 15){
         this.error_message = "invalid window size: " + this.window_width;
         return "ERR";
       }
       this.mode = (this.hold & 0x200) !== 0 ? "DICTID" : "TYPE";
       this.CLEARACCUMULATOR();
+      console.log(`Header read\n\tmethod: DEFLATE\n\twindow width: ${this.window_width}`);
       break;//HEAD
     case "DICTID":
       this.error_message = "use of external dict is not supported"
@@ -44,15 +45,16 @@ class ZLIB_DECODER{
         break;
       }
       this.GETBITS(3);
-      this.last = BITS(1);
+      this.last = this.BITS(1);
       this.CONSUMEBITS(1);
       //this might need a bit more elbow grease
-      switch(BITS(2)){
+      switch(this.BITS(2)){
         //stored
         case 0:
-          this.mode = stored;
+          this.mode = "STORED";
           break;
       }
+      
       return "ERR";
       break;
     default:
