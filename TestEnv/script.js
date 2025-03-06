@@ -10,4 +10,7 @@ file_in.onchange = (e)=>{
         console.error("WOHA there pal, that is not a shockwafe flash file!");
         return;
     }
+    READER.read(file).then((result)=>{
+      console.log(result);
+    }).catch((err)=>console.error(err));
 }
