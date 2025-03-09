@@ -20,15 +20,15 @@ class READER{
         //console.log(fr.result);
         switch(byteView[0]){
           case 83: // S - uncompressed
-            resolve({"data":byteView.slice(8), "version": byteView[3]});
+            resolve({"data": byteView.slice(8), "version": byteView[3]});
             break;
           case 67: // C - ZLIB compression
             let zd = new ZLIB_DECODER(fr.result.slice(8));
             if(zd.inflate() !== "OK"){
-              console.error("extraction error: ", zd.error_message);
+              reject("extraction error: " + zd.error_message);
               return;
             }
-            return {"data":zd.result, "version": byteView[3]};
+            resolve({"data": zd.result, "version": byteView[3]});
             break;
           case 90: // Z - the newer compression type I'm not brave enough to tackle right now
             reject("Not yet implemented");
