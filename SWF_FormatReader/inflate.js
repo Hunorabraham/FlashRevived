@@ -9,7 +9,7 @@ class ZLIB_DECODER{
     this.last = false;
     this.window_width = 0;
     this.written = 0; // number of bytes written to result
-    this.tree = {};
+    this.current_tree = {};
   }
   inflate(){
       this.GETBITS(16);
@@ -47,14 +47,14 @@ class ZLIB_DECODER{
           this.CONSUMEBITS(1);
           switch(this.BITS(2)){
             case 0:
-              block_part = "non-compressed";
-              this.ALIGNTOBYTE();
               this.CLEARACCUMULATOR();
+              block_part = "non-compressed";
               break;
             case 1:
               block_part = "LEN";
               break;
             case 2:
+              this.CONSUMEBITS(2);
               block_part = "dynamic-huffman";
               break;
             case 3:
@@ -77,6 +77,32 @@ class ZLIB_DECODER{
           block_part = "head";
           break;
         case "dynamic-huffman":
+          //table info
+          this.GETBITS(14);
+          let lit_length_count = this.BITS(5)+257;
+          this.CONSUMEBITS(5);
+          let distance_count = this.BITS(5)+1;
+          this.CONSUMEBITS(5);
+          let code_lenght_code_count = this.BITS(4)+4;
+          this.CONSUMEBITS(4);
+          //get lengths of length codes
+          let lenght_lengths = Array(19).fill(0);
+          console.log(lenght_lengths);
+          //a little more magic
+          let indicies = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
+          //we already hace 2 bits of the first
+          this.GETBITS(1);
+          lenght_lengths[indicies[0]] = BITS(3);
+          this.CONSUMEBITS(3);
+          for(let i = 1; i < code_lenght_code_count; i++){
+            this.GETBITS(3);
+            lenght_lengths[i] = this.BITS(3);
+            this.CONSUMEBITS(3);
+          }
+          
+          //generate length tree
+          let length_tree = {};
+          
           
           
           block_part = "intentional error";
