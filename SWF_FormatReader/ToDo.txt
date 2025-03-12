@@ -12,3 +12,7 @@ Roadmap:
   > file read :)
   > uncompress
     > ZLIB
+    > header :)
+    > dynamic huffman :)
+    > general decompression
+      > make getNextSymbol(huffman_tree) to make code tidier
