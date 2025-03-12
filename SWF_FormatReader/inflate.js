@@ -14,6 +14,8 @@ class ZLIB_DECODER{
     this.written = 0; // number of bytes written to result
     this.literal_tree = null;
     this.distance_tree = null;
+    this.current_index = 0;
+    this.extracted_blocks = 0;
   }
   static MAXBITS = 16;
   static createStringCode(code, len){
@@ -100,8 +102,8 @@ class ZLIB_DECODER{
       switch(block_part){
         case "head":
           if(this.last){
-            this.ALIGNTOBYTE();
-            this.Check();
+            this.error_message = `reached last block; final size: ${this.written}, read ${this.reading_position} bytes`;
+            return false;
           }
           this.GETBITS(3);
           if(this.BITS(1)===1) this.last = true;
@@ -160,7 +162,7 @@ class ZLIB_DECODER{
           let length_tree = ZLIB_DECODER.generateTree(length_lengths);
           //get lenths of literal/length alphabet
           let literal_lengths = []; //intentionally only named it literal
-          let current_index = 0;
+          this.current_index = 0;
           while(literal_lengths.length < lit_length_count){
             //get next bit
             this.GETBITS(1);
@@ -168,11 +170,11 @@ class ZLIB_DECODER{
             this.CONSUMEBITS(1);
             
             //move down in tree
-            current_index = length_tree[current_index][step];
+            this.current_index = length_tree[this.current_index][step];
             //check if reached valid symbol
-            if(!length_tree[current_index].code) continue;
+            if(!length_tree[this.current_index].code) continue;
             //do alphabet with value
-            let symbol = length_tree[current_index].value;
+            let symbol = length_tree[this.current_index].value;
             if(symbol<16){
               literal_lengths.push(symbol);
             }
@@ -201,11 +203,11 @@ class ZLIB_DECODER{
               }
             }
             //go back to head of tree
-            current_index = 0;
+            this.current_index = 0;
           }//literal lengths for
           //get lengths of distance alphabet
           let distance_lengths = [];
-          current_index = 0;
+          this.current_index = 0;
           while(distance_lengths.length < distance_count){
             //get next bit
             this.GETBITS(1);
@@ -213,11 +215,11 @@ class ZLIB_DECODER{
             this.CONSUMEBITS(1);
             
             //move down in tree
-            current_index = length_tree[current_index][step];
+            this.current_index = length_tree[this.current_index][step];
             //check if reached valid symbol
-            if(!length_tree[current_index].code) continue;
+            if(!length_tree[this.current_index].code) continue;
             //do alphabet with value
-            let symbol = length_tree[current_index].value;
+            let symbol = length_tree[this.current_index].value;
             if(symbol<16){
               distance_lengths.push(symbol);
             }
@@ -246,7 +248,7 @@ class ZLIB_DECODER{
               }
             }
             //go back to head of tree
-            current_index = 0;
+            this.current_index = 0;
           }//literal lengths for
           
           //generate trees
@@ -255,139 +257,299 @@ class ZLIB_DECODER{
           block_part = "decode";
           break;
         case "decode":
-          let current_index = 0;
+          this.current_index = 0;
           while(true){
             this.GETBITS(1);
             let step = this.BITS(1) == 0 ? "left" : "right";
             this.CONSUMEBITS(1);
+            this.current_index = this.literal_tree[this.current_index][step];
             //check if valid literal/length symbol
-            if(!this.literal_tree[current_index].code) continue;
-            let symbol = this.literal_tree[current_index].value;
+            if(!this.literal_tree[this.current_index].code) continue;
+            let symbol = this.literal_tree[this.current_index].value;
+            //literal
             if(symbol < 256){
               this.write(symbol);
+              //go to head of tree
+              this.current_index = 0;
+              continue;
             }
-            else if(symbol === 256){
-              //end of block
+            //end of block
+            if(symbol === 256){
               block_part = "head";
+              console.log("done with block #"+this.extracted_blocks++);
               continue major_while;
             }
-            else{
-              //length distance pair
-              let length = null;
-              let distance = null;
-              //down we go
-              if(symbol < 265){
-                length = symbol - 254; 
-              }
-              else{
-              //see no evil
-              switch(symbol){
-                case 265:
-                  this.GETBITS(1);
-                  length = 11 + this.BITS(1);
-                  this.CONSUMEBITS(1);
-                  break;
-                case 266:
-                  this.GETBITS(1);
-                  length = 13 + this.BITS(1);
-                  this.CONSUMEBITS(1);
-                  break;
-                case 267:
-                  this.GETBITS(1);
-                  length = 15 + this.BITS(1);
-                  this.CONSUMEBITS(1);
-                  break;
-                case 268:
-                  this.GETBITS(1);
-                  length = 17 + this.BITS(1);
-                  this.CONSUMEBITS(1);
-                  break;
-                case 269:
-                  this.GETBITS(2);
-                  length = 19 + this.BITS(2);
-                  this.CONSUMEBITS(2);
-                  break;
-                case 270:
-                  this.GETBITS(2);
-                  length = 23 + this.BITS(2);
-                  this.CONSUMEBITS(2);
-                  break;
-                case 271:
-                  this.GETBITS(2);
-                  length = 27 + this.BITS(2);
-                  this.CONSUMEBITS(2);
-                  break;
-                case 272:
-                  this.GETBITS(2);
-                  length = 31 + this.BITS(2);
-                  this.CONSUMEBITS(2);
-                  break;
-                case 273:
-                  this.GETBITS(3);
-                  length = 35 + this.BITS(3);
-                  this.CONSUMEBITS(3);
-                  break;
-                case 274:
-                  this.GETBITS(3);
-                  length = 43 + this.BITS(3);
-                  this.CONSUMEBITS(3);
-                  break;
-                case 275:
-                  this.GETBITS(3);
-                  length = 51 + this.BITS(3);
-                  this.CONSUMEBITS(3);
-                  break;
-                case 276:
-                  this.GETBITS(3);
-                  length = 59 + this.BITS(3);
-                  this.CONSUMEBITS(3);
-                  break;
-                case 277:
-                  this.GETBITS(4);
-                  length = 67 + this.BITS(4);
-                  this.CONSUMEBITS(4);
-                  break;
-                case 278:
-                  this.GETBITS(4);
-                  length = 83 + this.BITS(4);
-                  this.CONSUMEBITS(4);
-                  break;
-                case 279:
-                  this.GETBITS(4);
-                  length = 99 + this.BITS(4);
-                  this.CONSUMEBITS(4);
-                  break;
-                case 280:
-                  this.GETBITS(4);
-                  length = 115 + this.BITS(4);
-                  this.CONSUMEBITS(4);
-                  break;
-                case 281:
-                  this.GETBITS(5);
-                  length = 131 + this.BITS(5);
-                  this.CONSUMEBITS(5);
-                  break;
-                case 282:
-                  this.GETBITS(5);
-                  length = 163 + this.BITS(5);
-                  this.CONSUMEBITS(5);
-                  break;
-                case 283:
-                  this.GETBITS(5);
-                  length = 195 + this.BITS(5);
-                  this.CONSUMEBITS(5);
-                  break;
-                case 284:
-                  this.GETBITS(5);
-                  length = 227 + this.BITS(5);
-                  this.CONSUMEBITS(5);
-                  break;
-                case 285:
-                  length = 285;
-                  break;
-              }
-              }
+            //length distance pair
+            let length = null;
+            let distance = null;
+            //down we go
+            if(symbol < 265){
+              length = symbol - 254; 
             }
+            else{
+            //see no evil
+            switch(symbol){
+              case 265:
+                this.GETBITS(1);
+                length = 11 + this.BITS(1);
+                this.CONSUMEBITS(1);
+                break;
+              case 266:
+                this.GETBITS(1);
+                length = 13 + this.BITS(1);
+                this.CONSUMEBITS(1);
+                break;
+              case 267:
+                this.GETBITS(1);
+                length = 15 + this.BITS(1);
+                this.CONSUMEBITS(1);
+                break;
+              case 268:
+                this.GETBITS(1);
+                length = 17 + this.BITS(1);
+                this.CONSUMEBITS(1);
+                break;
+              case 269:
+                this.GETBITS(2);
+                length = 19 + this.BITS(2);
+                this.CONSUMEBITS(2);
+                break;
+              case 270:
+                this.GETBITS(2);
+                length = 23 + this.BITS(2);
+                this.CONSUMEBITS(2);
+                break;
+              case 271:
+                this.GETBITS(2);
+                length = 27 + this.BITS(2);
+                this.CONSUMEBITS(2);
+                break;
+              case 272:
+                this.GETBITS(2);
+                length = 31 + this.BITS(2);
+                this.CONSUMEBITS(2);
+                break;
+              case 273:
+                this.GETBITS(3);
+                length = 35 + this.BITS(3);
+                this.CONSUMEBITS(3);
+                break;
+              case 274:
+                this.GETBITS(3);
+                length = 43 + this.BITS(3);
+                this.CONSUMEBITS(3);
+                break;
+              case 275:
+                this.GETBITS(3);
+                length = 51 + this.BITS(3);
+                this.CONSUMEBITS(3);
+                break;
+              case 276:
+                this.GETBITS(3);
+                length = 59 + this.BITS(3);
+                this.CONSUMEBITS(3);
+                break;
+              case 277:
+                this.GETBITS(4);
+                length = 67 + this.BITS(4);
+                this.CONSUMEBITS(4);
+                break;
+              case 278:
+                this.GETBITS(4);
+                length = 83 + this.BITS(4);
+                this.CONSUMEBITS(4);
+                break;
+              case 279:
+                this.GETBITS(4);
+                length = 99 + this.BITS(4);
+                this.CONSUMEBITS(4);
+                break;
+              case 280:
+                this.GETBITS(4);
+                length = 115 + this.BITS(4);
+                this.CONSUMEBITS(4);
+                break;
+              case 281:
+                this.GETBITS(5);
+                length = 131 + this.BITS(5);
+                this.CONSUMEBITS(5);
+                break;
+              case 282:
+                this.GETBITS(5);
+                length = 163 + this.BITS(5);
+                this.CONSUMEBITS(5);
+                break;
+              case 283:
+                this.GETBITS(5);
+                length = 195 + this.BITS(5);
+                this.CONSUMEBITS(5);
+                break;
+              case 284:
+                this.GETBITS(5);
+                length = 227 + this.BITS(5);
+                this.CONSUMEBITS(5);
+                break;
+              case 285:
+                length = 285;
+                break;
+            }
+            }
+            //get distance
+            let d_current_index = 0;
+            while(true){
+              this.GETBITS(1);
+              let d_step = this.BITS(1) == 0 ? "left" : "right";
+              this.CONSUMEBITS(1);
+              d_current_index = this.distance_tree[d_current_index][d_step];
+              if(!this.distance_tree[d_current_index].code) continue;
+              //we only need one symbol
+              symbol = this.distance_tree[d_current_index].value;
+              break;
+            }
+            if(symbol < 4){
+              distance = symbol + 1;
+            }
+            else{
+            //another one bites the dusst
+            switch(symbol){
+              case 4:
+                this.GETBITS(1);
+                distance = 5 + this.BITS(1);
+                this.CONSUMEBITS(1);
+                break;
+              case 5:
+                this.GETBITS(1);
+                distance = 7 + this.BITS(1);
+                this.CONSUMEBITS(1);
+                break;
+              case 6:
+                this.GETBITS(2);
+                distance = 9 + this.BITS(2);
+                this.CONSUMEBITS(2);
+                break;
+              case 7:
+                this.GETBITS(2);
+                distance = 13 + this.BITS(2);
+                this.CONSUMEBITS(2);
+                break;
+              case 8:
+                this.GETBITS(3);
+                distance = 17 + this.BITS(3);
+                this.CONSUMEBITS(3);
+                break;
+              case 9:
+                this.GETBITS(3);
+                distance = 25 + this.BITS(3);
+                this.CONSUMEBITS(3);
+                break;
+              case 10:
+                this.GETBITS(4);
+                distance = 33 + this.BITS(4);
+                this.CONSUMEBITS(4);
+                break;
+              case 11:
+                this.GETBITS(4);
+                distance = 49 + this.BITS(4);
+                this.CONSUMEBITS(4);
+                break;
+              case 12:
+                this.GETBITS(5);
+                distance = 65 + this.BITS(5);
+                this.CONSUMEBITS(5);
+                break;
+              case 13:
+                this.GETBITS(5);
+                distance = 97 + this.BITS(5);
+                this.CONSUMEBITS(5);
+                break;
+              case 14:
+                this.GETBITS(6);
+                distance = 129 + this.BITS(6);
+                this.CONSUMEBITS(6);
+                break;
+              case 15:
+                this.GETBITS(6);
+                distance = 193 + this.BITS(6);
+                this.CONSUMEBITS(6);
+                break;
+              case 16:
+                this.GETBITS(7);
+                distance = 257 + this.BITS(7);
+                this.CONSUMEBITS(7);
+                break;
+              case 17:
+                this.GETBITS(7);
+                distance = 385 + this.BITS(7);
+                this.CONSUMEBITS(7);
+                break;
+              case 18:
+                this.GETBITS(8);
+                distance = 513 + this.BITS(8);
+                this.CONSUMEBITS(8);
+                break;
+              case 19:
+                this.GETBITS(8);
+                distance = 769 + this.BITS(8);
+                this.CONSUMEBITS(8);
+                break;
+              case 20:
+                this.GETBITS(9);
+                distance = 1025 + this.BITS(9);
+                this.CONSUMEBITS(9);
+                break;
+              case 21:
+                this.GETBITS(9);
+                distance = 1537 + this.BITS(9);
+                this.CONSUMEBITS(9);
+                break;
+              case 22:
+                this.GETBITS(10);
+                distance = 2049 + this.BITS(10);
+                this.CONSUMEBITS(10);
+                break;
+              case 23:
+                this.GETBITS(10);
+                distance = 3073 + this.BITS(10);
+                this.CONSUMEBITS(10);
+                break;
+              case 24:
+                this.GETBITS(11);
+                distance = 4097 + this.BITS(11);
+                this.CONSUMEBITS(11);
+                break;
+              case 25:
+                this.GETBITS(11);
+                distance = 6145 + this.BITS(11);
+                this.CONSUMEBITS(11);
+                break;
+              case 26:
+                this.GETBITS(12);
+                distance = 8193 + this.BITS(12);
+                this.CONSUMEBITS(12);
+                break;
+              case 27:
+                this.GETBITS(12);
+                distance = 12289 + this.BITS(12);
+                this.CONSUMEBITS(12);
+                break;
+              case 28:
+                this.GETBITS(13);
+                distance = 16385 + this.BITS(13);
+                this.CONSUMEBITS(13);
+                break;
+              case 29:
+                this.GETBITS(13);
+                distance = 24577 + this.BITS(13);
+                this.CONSUMEBITS(13);
+                break;
+            }
+            }
+            //now execute the length distance extraction
+            for(let i = 0; i < length; i++){
+              this.write(this.result[-distance]);
+            }
+            //go to head of tree
+            this.current_index = 0;
           }//while
           block_part = "how did we get here???";
           break;
