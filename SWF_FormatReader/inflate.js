@@ -276,8 +276,116 @@ class ZLIB_DECODER{
               let length = null;
               let distance = null;
               //down we go
+              if(symbol < 265){
+                length = symbol - 254; 
+              }
+              else{
+              //see no evil
               switch(symbol){
-                
+                case 265:
+                  this.GETBITS(1);
+                  length = 11 + this.BITS(1);
+                  this.CONSUMEBITS(1);
+                  break;
+                case 266:
+                  this.GETBITS(1);
+                  length = 13 + this.BITS(1);
+                  this.CONSUMEBITS(1);
+                  break;
+                case 267:
+                  this.GETBITS(1);
+                  length = 15 + this.BITS(1);
+                  this.CONSUMEBITS(1);
+                  break;
+                case 268:
+                  this.GETBITS(1);
+                  length = 17 + this.BITS(1);
+                  this.CONSUMEBITS(1);
+                  break;
+                case 269:
+                  this.GETBITS(2);
+                  length = 19 + this.BITS(2);
+                  this.CONSUMEBITS(2);
+                  break;
+                case 270:
+                  this.GETBITS(2);
+                  length = 23 + this.BITS(2);
+                  this.CONSUMEBITS(2);
+                  break;
+                case 271:
+                  this.GETBITS(2);
+                  length = 27 + this.BITS(2);
+                  this.CONSUMEBITS(2);
+                  break;
+                case 272:
+                  this.GETBITS(2);
+                  length = 31 + this.BITS(2);
+                  this.CONSUMEBITS(2);
+                  break;
+                case 273:
+                  this.GETBITS(3);
+                  length = 35 + this.BITS(3);
+                  this.CONSUMEBITS(3);
+                  break;
+                case 274:
+                  this.GETBITS(3);
+                  length = 43 + this.BITS(3);
+                  this.CONSUMEBITS(3);
+                  break;
+                case 275:
+                  this.GETBITS(3);
+                  length = 51 + this.BITS(3);
+                  this.CONSUMEBITS(3);
+                  break;
+                case 276:
+                  this.GETBITS(3);
+                  length = 59 + this.BITS(3);
+                  this.CONSUMEBITS(3);
+                  break;
+                case 277:
+                  this.GETBITS(4);
+                  length = 67 + this.BITS(4);
+                  this.CONSUMEBITS(4);
+                  break;
+                case 278:
+                  this.GETBITS(4);
+                  length = 83 + this.BITS(4);
+                  this.CONSUMEBITS(4);
+                  break;
+                case 279:
+                  this.GETBITS(4);
+                  length = 99 + this.BITS(4);
+                  this.CONSUMEBITS(4);
+                  break;
+                case 280:
+                  this.GETBITS(4);
+                  length = 115 + this.BITS(4);
+                  this.CONSUMEBITS(4);
+                  break;
+                case 281:
+                  this.GETBITS(5);
+                  length = 131 + this.BITS(5);
+                  this.CONSUMEBITS(5);
+                  break;
+                case 282:
+                  this.GETBITS(5);
+                  length = 163 + this.BITS(5);
+                  this.CONSUMEBITS(5);
+                  break;
+                case 283:
+                  this.GETBITS(5);
+                  length = 195 + this.BITS(5);
+                  this.CONSUMEBITS(5);
+                  break;
+                case 284:
+                  this.GETBITS(5);
+                  length = 227 + this.BITS(5);
+                  this.CONSUMEBITS(5);
+                  break;
+                case 285:
+                  length = 285;
+                  break;
+              }
               }
             }
           }//while
