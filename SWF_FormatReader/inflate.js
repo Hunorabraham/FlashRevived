@@ -12,7 +12,8 @@ class ZLIB_DECODER{
     this.last = false;
     this.window_width = 0;
     this.written = 0; // number of bytes written to result
-    this.current_tree = {};
+    this.literal_tree = null;
+    this.distance_tree = null;
   }
   static MAXBITS = 16;
   static createStringCode(code, len){
@@ -95,7 +96,7 @@ class ZLIB_DECODER{
       this.CLEARACCUMULATOR();
       console.log(`Header read\n\tmethod: DEFLATE\n\twindow width: ${this.window_width}`);
       let block_part = "head";
-      while(true){
+      major_while: while(true){
       switch(block_part){
         case "head":
           if(this.last){
@@ -145,7 +146,6 @@ class ZLIB_DECODER{
           this.CONSUMEBITS(5);
           let code_length_code_count = this.BITS(4)+4;
           this.CONSUMEBITS(4);
-          
           //get lengths of length codes
           let length_lengths = Array(19).fill(0);
           //a little index magic for specific order
@@ -155,14 +155,13 @@ class ZLIB_DECODER{
             length_lengths[indicies[i]] = this.BITS(3);
             this.CONSUMEBITS(3);
           }
-          console.log(code_length_code_count, length_lengths);
           
           //generate length tree
           let length_tree = ZLIB_DECODER.generateTree(length_lengths);
           //get lenths of literal/length alphabet
           let literal_lengths = []; //intentionally only named it literal
           let current_index = 0;
-          for(let i = 0; i < lit_length_count; i++){
+          while(literal_lengths.length < lit_length_count){
             //get next bit
             this.GETBITS(1);
             let step = this.BITS(1) == 0 ? "left" : "right";
@@ -204,8 +203,85 @@ class ZLIB_DECODER{
             //go back to head of tree
             current_index = 0;
           }//literal lengths for
-          console.log(literal_lengths);
-          block_part = "intentional error";
+          //get lengths of distance alphabet
+          let distance_lengths = [];
+          current_index = 0;
+          while(distance_lengths.length < distance_count){
+            //get next bit
+            this.GETBITS(1);
+            let step = this.BITS(1) == 0 ? "left" : "right";
+            this.CONSUMEBITS(1);
+            
+            //move down in tree
+            current_index = length_tree[current_index][step];
+            //check if reached valid symbol
+            if(!length_tree[current_index].code) continue;
+            //do alphabet with value
+            let symbol = length_tree[current_index].value;
+            if(symbol<16){
+              distance_lengths.push(symbol);
+            }
+            else if(symbol == 16){
+              this.GETBITS(2);
+              let repeat_count = this.BITS(2)+3;
+              this.CONSUMEBITS(2);
+              for(let i = 0; i < repeat_count; i++){
+                distance_lengths.push(distance_lengths[distance_lengths.length-1]);
+              }
+            }
+            else if(symbol == 17){
+              this.GETBITS(3);
+              let zeroes = this.BITS(3)+3;
+              this.CONSUMEBITS(3);
+              for(let i = 0; i < zeroes; i++){
+                distance_lengths.push(0);
+              }
+            }
+            else{
+              this.GETBITS(7);
+              let zeroes = this.BITS(7)+11;
+              this.CONSUMEBITS(7);
+              for(let i = 0; i < zeroes; i++){
+                distance_lengths.push(0);
+              }
+            }
+            //go back to head of tree
+            current_index = 0;
+          }//literal lengths for
+          
+          //generate trees
+          this.literal_tree = ZLIB_DECODER.generateTree(literal_lengths);
+          this.distance_tree = ZLIB_DECODER.generateTree(distance_lengths);
+          block_part = "decode";
+          break;
+        case "decode":
+          let current_index = 0;
+          while(true){
+            this.GETBITS(1);
+            let step = this.BITS(1) == 0 ? "left" : "right";
+            this.CONSUMEBITS(1);
+            //check if valid literal/length symbol
+            if(!this.literal_tree[current_index].code) continue;
+            let symbol = this.literal_tree[current_index].value;
+            if(symbol < 256){
+              this.write(symbol);
+            }
+            else if(symbol === 256){
+              //end of block
+              block_part = "head";
+              continue major_while;
+            }
+            else{
+              //length distance pair
+              let length = null;
+              let distance = null;
+              //down we go
+              switch(symbol){
+                
+              }
+            }
+          }//while
+          block_part = "how did we get here???";
           break;
         default:
           this.error_message = "unexpected/not implemented block part: " + block_part;
