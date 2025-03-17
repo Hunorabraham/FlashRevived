@@ -49,7 +49,6 @@ class ZLIB_DECODER{
     let placed_codes = 0;
     let total_codes = lengths.filter(len => len != 0).length;
     let iter = 0;
-    let maxiter = 2000;
     while(placed_codes < total_codes){
       current_code = tree[current_place].partial_code;
       let match = flat_tree.find(code=>code===current_code);
@@ -70,7 +69,6 @@ class ZLIB_DECODER{
       }
       //step forward
       current_place++;
-      if(iter++ >= maxiter) break;
     }
     return tree;
   }
@@ -161,29 +159,19 @@ class ZLIB_DECODER{
           //generate length tree
           let length_tree = ZLIB_DECODER.generateTree(length_lengths);
           //get lenths of literal/length alphabet
-          let literal_lengths = []; //intentionally only named it literal
+          let actual_lengths = []; //lengths for the literal_length-, and distance_trees
           this.current_index = 0;
-          while(literal_lengths.length < lit_length_count){
-            //get next bit
-            this.GETBITS(1);
-            let step = this.BITS(1) == 0 ? "left" : "right";
-            this.CONSUMEBITS(1);
-            
-            //move down in tree
-            this.current_index = length_tree[this.current_index][step];
-            //check if reached valid symbol
-            if(!length_tree[this.current_index].code) continue;
-            //do alphabet with value
-            let symbol = length_tree[this.current_index].value;
+          while(actual_lengths.length < lit_length_count + distance_count){
+            let symbol = this.getNextSymbol(length_tree);
             if(symbol<16){
-              literal_lengths.push(symbol);
+              actual_lengths.push(symbol);
             }
             else if(symbol == 16){
               this.GETBITS(2);
               let repeat_count = this.BITS(2)+3;
               this.CONSUMEBITS(2);
               for(let i = 0; i < repeat_count; i++){
-                literal_lengths.push(literal_lengths[literal_lengths.length-1]);
+                actual_lengths.push(actual_lengths[actual_lengths.length-1]);
               }
             }
             else if(symbol == 17){
@@ -191,7 +179,7 @@ class ZLIB_DECODER{
               let zeroes = this.BITS(3)+3;
               this.CONSUMEBITS(3);
               for(let i = 0; i < zeroes; i++){
-                literal_lengths.push(0);
+                actual_lengths.push(0);
               }
             }
             else{
@@ -199,73 +187,20 @@ class ZLIB_DECODER{
               let zeroes = this.BITS(7)+11;
               this.CONSUMEBITS(7);
               for(let i = 0; i < zeroes; i++){
-                literal_lengths.push(0);
+                actual_lengths.push(0);
               }
             }
-            //go back to head of tree
-            this.current_index = 0;
           }//literal lengths for
-          //get lengths of distance alphabet
-          let distance_lengths = [];
-          this.current_index = 0;
-          while(distance_lengths.length < distance_count){
-            //get next bit
-            this.GETBITS(1);
-            let step = this.BITS(1) == 0 ? "left" : "right";
-            this.CONSUMEBITS(1);
-            
-            //move down in tree
-            this.current_index = length_tree[this.current_index][step];
-            //check if reached valid symbol
-            if(!length_tree[this.current_index].code) continue;
-            //do alphabet with value
-            let symbol = length_tree[this.current_index].value;
-            if(symbol<16){
-              distance_lengths.push(symbol);
-            }
-            else if(symbol == 16){
-              this.GETBITS(2);
-              let repeat_count = this.BITS(2)+3;
-              this.CONSUMEBITS(2);
-              for(let i = 0; i < repeat_count; i++){
-                distance_lengths.push(distance_lengths[distance_lengths.length-1]);
-              }
-            }
-            else if(symbol == 17){
-              this.GETBITS(3);
-              let zeroes = this.BITS(3)+3;
-              this.CONSUMEBITS(3);
-              for(let i = 0; i < zeroes; i++){
-                distance_lengths.push(0);
-              }
-            }
-            else{
-              this.GETBITS(7);
-              let zeroes = this.BITS(7)+11;
-              this.CONSUMEBITS(7);
-              for(let i = 0; i < zeroes; i++){
-                distance_lengths.push(0);
-              }
-            }
-            //go back to head of tree
-            this.current_index = 0;
-          }//literal lengths for
-          
+          if(actual_lengths.length !== lit_length_count + distance_count) console.error("extracted length mismatch reading distance: ", actual_lengths.length, lit_length_count + distance_count);
           //generate trees
-          this.literal_tree = ZLIB_DECODER.generateTree(literal_lengths);
-          this.distance_tree = ZLIB_DECODER.generateTree(distance_lengths);
+          this.literal_tree = ZLIB_DECODER.generateTree(actual_lengths.slice(0,lit_length_count));
+          this.distance_tree = ZLIB_DECODER.generateTree(actual_lengths.slice(lit_length_count));
           block_part = "decode";
           break;
         case "decode":
           this.current_index = 0;
           while(true){
-            this.GETBITS(1);
-            let step = this.BITS(1) == 0 ? "left" : "right";
-            this.CONSUMEBITS(1);
-            this.current_index = this.literal_tree[this.current_index][step];
-            //check if valid literal/length symbol
-            if(!this.literal_tree[this.current_index].code) continue;
-            let symbol = this.literal_tree[this.current_index].value;
+            let symbol = this.getNextSymbol(this.literal_tree);
             //literal
             if(symbol < 256){
               this.write(symbol);
@@ -395,17 +330,7 @@ class ZLIB_DECODER{
             }
             }
             //get distance
-            let d_current_index = 0;
-            while(true){
-              this.GETBITS(1);
-              let d_step = this.BITS(1) == 0 ? "left" : "right";
-              this.CONSUMEBITS(1);
-              d_current_index = this.distance_tree[d_current_index][d_step];
-              if(!this.distance_tree[d_current_index].code) continue;
-              //we only need one symbol
-              symbol = this.distance_tree[d_current_index].value;
-              break;
-            }
+            symbol = this.getNextSymbol(this.distance_tree);
             if(symbol < 4){
               distance = symbol + 1;
             }
@@ -545,8 +470,9 @@ class ZLIB_DECODER{
             }
             }
             //now execute the length distance extraction
+            let start = this.written;
             for(let i = 0; i < length; i++){
-              this.write(this.result[-distance]);
+              this.write(this.result[this.written-distance]);
             }
             //go to head of tree
             this.current_index = 0;
@@ -604,5 +530,16 @@ class ZLIB_DECODER{
     for(one_byte of array){
       this.result[this.written++] = one_byte;
     }
+  }
+  getNextSymbol(tree){
+    let step = null;
+    let current_index = 0;
+    while(!tree[current_index].code){
+      this.GETBITS(1);
+      let step = this.BITS(1) == 0 ? "left" : "right";
+      this.CONSUMEBITS(1);
+      current_index = tree[current_index][step];
+    }
+    return tree[current_index].value;
   }
 }
