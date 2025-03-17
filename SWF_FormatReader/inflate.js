@@ -15,7 +15,7 @@ class ZLIB_DECODER{
     this.literal_tree = null;
     this.distance_tree = null;
     this.current_index = 0;
-    this.extracted_blocks = 0;
+    this.extracted_blocks = 0;  
   }
   static MAXBITS = 16;
   static createStringCode(code, len){
@@ -24,6 +24,20 @@ class ZLIB_DECODER{
       result = (((code >> i) & 1n) == 0n ? "0" : "1") + result;
     }
     return result;
+  }
+  static test(){
+    let source = [
+      0b00111011
+    ];
+    let tree = ZLIB_DECODER.generateTree([2,2,3,3,3,3]);
+    console.log(tree);
+    let extracted_size = 3;
+    let zd = new ZLIB_DECODER(source);
+    let symbols = [];
+    while(symbols.length < extracted_size){
+      symbols.push(zd.getNextSymbol(tree));
+    }
+    console.log(symbols);
   }
   static generateTree(lengths){
     //get count of lengths
@@ -100,8 +114,13 @@ class ZLIB_DECODER{
       switch(block_part){
         case "head":
           if(this.last){
-            this.error_message = `reached last block; final size: ${this.written}, read ${this.reading_position} bytes`;
-            return false;
+            console.log(`reached end of deflated blocks, total writes: ${this.written}`)
+            this.ALIGNTOBYTE();
+            if(!this.checkAdler()){
+              this.error_message = "adler32 check failed, data may be corrupted";
+              return false;
+            }
+            return true;
           }
           this.GETBITS(3);
           if(this.BITS(1)===1) this.last = true;
@@ -470,7 +489,6 @@ class ZLIB_DECODER{
             }
             }
             //now execute the length distance extraction
-            let start = this.written;
             for(let i = 0; i < length; i++){
               this.write(this.result[this.written-distance]);
             }
@@ -541,5 +559,11 @@ class ZLIB_DECODER{
       current_index = tree[current_index][step];
     }
     return tree[current_index].value;
+  }
+  checkAdler(){
+    this.GETBITS(32);
+    let s1 = this.BITS(16);
+    let s2 = this.hold >> 16;
+    return true;
   }
 }
