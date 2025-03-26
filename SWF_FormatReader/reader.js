@@ -11,20 +11,23 @@ let iter = 0;
 */
 class READER{
   static hello(){console.log("hello, testing complete..."); console.error("THERE ARE ALWAYS ERRORS");}
-  static read(file){
+  static read(file, testData){
     let fr = new FileReader();
     fr.readAsArrayBuffer(file);
     return new Promise((resolve, reject)=>{
       fr.onload = ()=>{
         const byteView = new Uint8Array(fr.result);
-        //console.log(fr.result);
+        console.log(fr.result);
         switch(byteView[0]){
-          case 83: // S - uncompressed
+          case 70: // S - uncompressed
             resolve({"data": byteView.slice(8), "version": byteView[3]});
             break;
           case 67: // C - ZLIB compression
-            let zd = new ZLIB_DECODER(fr.result.slice(8));
-            if(zd.inflate() !== "OK"){
+            console.log(`Version: ${byteView[3]}; Exctracted size: ${READER.littleEndianInt32(byteView.slice(4,8))}`);
+            let zd = new ZLIB_DECODER(fr.result, READER.littleEndianInt32(byteView.slice(4,8)));
+            if(testData != undefined) zd.addTestData(testData);
+            if(!zd.inflate()){
+              console.log(zd.result);
               reject("extraction error: " + zd.error_message);
               return;
             }
@@ -42,5 +45,12 @@ class READER{
         reject(error);
       }
     });
+  }
+  static littleEndianInt32(bytes){
+    let int32 = 0;
+    for(let i = 0; i < 4; i++){
+      int32 += bytes[i] << (i*8);
+    }
+    return int32;
   }
 }
