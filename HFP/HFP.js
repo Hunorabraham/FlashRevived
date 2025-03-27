@@ -34,21 +34,44 @@ class FLASH_PLAYER{
     this.renderer.initialise(Number(this.frame_size.width), Number(this.frame_size.height));
     this.test();
     console.log(this);
+    console.log(this.nextTag());
   }
   test(){
     this.renderer.draw_general_debug("fillRect", 10,10,100,100);
   }
   byteAlign(){this.hold = 0n; this.bits_remaining = 0n;}
+  //array onject containing tag names, clumsy creation because I define them as I go, <- clean up later
+  static TAG_TYPES = Object.assign(Array.prototype,{
+    1 : "ShowFrame",
+    69 : "FileAttributes",
+  });
+  TAG_SIGNATURES = {
+    "FileAttributes": (size)=>{
+      if(this.getBits(1n) !== 0n) throw("non zero reserved!");
+      let data_object = {};
+      data_object.UseDirectBlit = this.getBits(1n);
+      data_object.UseGPU = this.getBits(1n);
+      data_object.HasMetadata = this.getBits(1n);
+      data_object.ActionScript3 = this.getBits(1n);
+      if(this.getBits(2n) !== 0n) throw("non zero reserved!");
+      data_object.UseNetwork = this.getBits(1n);
+      if(this.getBits(24n) !== 0n) throw("non zero reserved!");
+      return data_object;
+    }
+  }
   nextTag(){
     //header
     let tag = {};
     let shortHead = this.getBytes(2n);
     console.log(shortHead);
     //  tag code
-    tag.code = shortHead >> 6n;
+    tag.type = FLASH_PLAYER.TAG_TYPES[shortHead >> 6n];
     tag.length = shortHead & 0x3fn;
     //  if the shortHead length code is 63, then it is a long head
     if(tag.length === 0x3fn) tag.length = this.getBytes(4n);
+    //data
+    let data = this.TAG_SIGNATURES[tag.type](this.length);
+    Object.keys(data).forEach(key=>tag[key] = data[key]);
     return tag;
   }
   //byte aligned
