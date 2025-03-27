@@ -17,21 +17,19 @@ class READER{
     return new Promise((resolve, reject)=>{
       fr.onload = ()=>{
         const byteView = new Uint8Array(fr.result);
-        console.log(fr.result);
         switch(byteView[0]){
           case 70: // S - uncompressed
-            resolve({"data": byteView.slice(8), "version": byteView[3]});
+            resolve(byteView);
             break;
           case 67: // C - ZLIB compression
             console.log(`Version: ${byteView[3]}; Exctracted size: ${READER.littleEndianInt32(byteView.slice(4,8))}`);
             let zd = new ZLIB_DECODER(fr.result, READER.littleEndianInt32(byteView.slice(4,8)));
             if(testData != undefined) zd.addTestData(testData);
             if(!zd.inflate()){
-              console.log(zd.result);
               reject("extraction error: " + zd.error_message);
               return;
             }
-            resolve({"data": zd.result, "version": byteView[3]});
+            resolve(zd.result);
             break;
           case 90: // Z - the newer compression type I'm not brave enough to tackle right now
             reject("Not yet implemented");
