@@ -23,6 +23,7 @@ class FLASH_PLAYER{
     this.hold = 0n; //the last read byte, only set if there are unused bits
     this.bits_remaining = 0n; //the number of unused bits in the last read byte
     this.error_message;
+    this.tag_stream = [];
   }
   run(){
     console.log("starting execution, SWF Version: " + this.data[3]);
@@ -33,8 +34,12 @@ class FLASH_PLAYER{
     this.frame_count = this.getRecord("UI16");
     this.renderer.initialise(Number(this.frame_size.width), Number(this.frame_size.height));
     this.test();
+    let tag;
+    do{
+      tag = this.nextTag();
+      this.tag_stream.push(tag);
+    } while(tag.type != "EndTag");
     console.log(this);
-    console.log(this.nextTag());
   }
   test(){
     this.renderer.draw_general_debug("fillRect", 10,10,100,100);
@@ -42,7 +47,9 @@ class FLASH_PLAYER{
   byteAlign(){this.hold = 0n; this.bits_remaining = 0n;}
   //array onject containing tag names, clumsy creation because I define them as I go, <- clean up later
   static TAG_TYPES = Object.assign(Array.prototype,{
+    0: "EndTag",
     1 : "ShowFrame",
+    9 : "SetBackgroundColor",
     69 : "FileAttributes",
   });
   TAG_SIGNATURES = {
@@ -57,19 +64,24 @@ class FLASH_PLAYER{
       data_object.UseNetwork = this.getBits(1n);
       if(this.getBits(24n) !== 0n) throw("non zero reserved!");
       return data_object;
-    }
-  }
+    },
+    "SetBackgroundColor": (size)=>{
+      return {"BackGroundColor": this.getRecord("RGB")};
+    },
+  };
   nextTag(){
     //header
     let tag = {};
     let shortHead = this.getBytes(2n);
-    console.log(shortHead);
     //  tag code
     tag.type = FLASH_PLAYER.TAG_TYPES[shortHead >> 6n];
     tag.length = shortHead & 0x3fn;
     //  if the shortHead length code is 63, then it is a long head
     if(tag.length === 0x3fn) tag.length = this.getBytes(4n);
     //data
+    if(tag.type == undefined) {
+      throw("unimplemented type: " + Number(shortHead >> 6n));
+    }
     let data = this.TAG_SIGNATURES[tag.type](this.length);
     Object.keys(data).forEach(key=>tag[key] = data[key]);
     return tag;
@@ -151,10 +163,18 @@ class FLASH_PLAYER{
         "width": (Xmax-Xmin)/20n,
         "height": (Ymax-Ymin)/20n,
       };
+    },
+    "RGB": ()=>{
+      return {
+        "Red": BigInt(this.nextByte()),
+        "Green": BigInt(this.nextByte()),
+        "Blue": BigInt(this.nextByte()),
+      }
     }
   };
   //recursive function to parse record data into a JS object
   getRecord(type){
+    if(this.TYPE_SIGNATURES[type] == undefined) throw("unimplemented type: " + type);
     return this.TYPE_SIGNATURES[type]();
   }
 }
