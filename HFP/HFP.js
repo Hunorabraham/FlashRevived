@@ -39,7 +39,6 @@ class FLASH_PLAYER{
       this.tag_stream.push(tag);
     } while(tag.type != "EndTag");
     console.log(this);
-    debugger;
   }
   test(){
     this.renderer.draw_general_debug("fillRect", 10,10,100,100);
@@ -182,54 +181,121 @@ class FLASH_PLAYER{
   }
   //dictionary of functions to load each type
   TYPE_SIGNATURES = {
-    "UB" : (n)=>{return this.getBits(n);},
-    "UI8" : ()=>{return this.getBytes(1);},
-    "UI16" : ()=>{return this.getBytes(2);},
-    "UI32" : ()=>{return this.getBytes(4);},
-    "UI64" : ()=>{return this.getBytes(8);},
-    "SI8" : ()=>{return this.getBytes(1);},
-    "SI16" : ()=>{return this.getBytes(2);},
-    "SI32" : ()=>{return this.getBytes(4);},
-    "SI64" : ()=>{return this.getBytes(8);},
-    "FIXED8": ()=>{return this.nextByte()/256 + this.nextByte();},
-    "RECT": ()=>{
+    SB: (n)=>{
+      let small = this.getBits(n);
+      if((small & (1n << (n-1))) == 1){
+        small |= (-1n << n);
+      }
+      return small;
+    }
+    UB: (n)=>{return this.getBits(n);},
+    UI8: ()=>{return this.getBytes(1);},
+    UI16: ()=>{return this.getBytes(2);},
+    UI32: ()=>{return this.getBytes(4);},
+    UI64: ()=>{return this.getBytes(8);},
+    SI8: ()=>{return this.getBytes(1);},
+    SI16: ()=>{return this.getBytes(2);},
+    SI32: ()=>{return this.getBytes(4);},
+    SI64: ()=>{return this.getBytes(8);},
+    FIXED8: ()=>{return this.nextByte()/256 + this.nextByte();},
+    RECT: ()=>{
       this.byteAlign();
-      
       let len = this.getBits(5n);
       let Xmin = this.getBits(len);
       let Xmax = this.getBits(len);
       let Ymin = this.getBits(len);
       let Ymax = this.getBits(len);
       return {
-        "Xmin": Xmin, 
-        "Xmax": Xmax, 
-        "Ymin": Ymin, 
-        "Ymax": Ymax,
+        Xmin: Xmin, 
+        Xmax: Xmax, 
+        Ymin: Ymin, 
+        Ymax: Ymax,
         //JS like properties
-        "left": Xmin,
-        "right": Ymin,
-        "width": (Xmax-Xmin)/20n,
-        "height": (Ymax-Ymin)/20n,
+        left: Xmin,
+        right: Ymin,
+        width: (Xmax-Xmin)/20n,
+        height: (Ymax-Ymin)/20n,
       };
     },
-    "RGB": ()=>{
+    RGB: ()=>{
       return {
-        "Red": BigInt(this.nextByte()),
-        "Green": BigInt(this.nextByte()),
-        "Blue": BigInt(this.nextByte()),
+        Red: BigInt(this.nextByte()),
+        Green: BigInt(this.nextByte()),
+        Blue: BigInt(this.nextByte()),
       }
     },
-    "RGBA": ()=>{
+    RGBA: ()=>{
       return {
-        "Red": BigInt(this.nextByte()),
-        "Green": BigInt(this.nextByte()),
-        "Blue": BigInt(this.nextByte()),
-        "Alpha": BigInt(this.nextByte()),
+        Red: BigInt(this.nextByte()),
+        Green: BigInt(this.nextByte()),
+        Blue: BigInt(this.nextByte()),
+        Alpha: BigInt(this.nextByte()),
       }
-    }
-    "SHAPEWITHSTYLE":()=>{
+    },
+    SHAPEWITHSTYLE:()=>{
+      return {
+        FillStyles: this.getRecord("FILLSTYLEARRAY"),
+        LineStyles: this.getRecord("LINESTYLEARRAY"),
+        NumFillBits: this.getBits(4n),
+        NumLineBits: this.getBits(4n),
+        ShapeRecords: this.getRecord("SHAPERECORD",FillBits,LineBits),
+      }
       //see page 228
-    }
+    },
+    SHAPERECORD:(FillBits, LineBits)=>{
+      let fill_bits = FillBits;
+      let line_bits = LineBits;
+      let record_list = [];
+      while(true){
+        let isLine = this.getBits(1)==1;
+        if(isLine){
+          
+        }
+        else{
+          let flags = this.getBits(5);
+          if(flags == 0){
+            record_list.push({type:"End"});
+            break;
+          }
+          let style_change_record = {
+            type:"Style",
+            HasMoveTo: flags & 0b00001 == 1,
+            HasFillStyle0: flags & 0b00010 == 1,
+            HasFillStyle1: flags & 0b00100 == 1,
+            HasLineStyle: flags & 0b01000 == 1,
+            HasNewStyles: flags & 0b10000 == 1,
+          };
+          if(style_change_record.HasMoveTo){
+            //State MoveTo
+            let bit_count = this.getBits(5);
+            style_change_record.DeltaX = this.getRecord("SB", bit_count);
+            style_change_record.DeltaY = this.getRecord("SB", bit_count);
+          }
+          if(style_change_record.HasFillStyle0){
+            //fill style 0
+            style_change_record.FillStyle0 = this.getBits(fill_bits);
+          }
+          if(style_change_record.HasFillStyle1){
+            //fill style 1
+            style_change_record.FillStyle1 = this.getBits(fill_bits);
+          }
+          if(style_change_record.HasLineStyle){
+            //line style
+            style_change_record.LineStyle = this.getBits(line_bits);
+          }
+          if(style_change_record.HasNewStyles){
+            //new styles
+            style_change_record.FillStyles = this.getRecord("FILLSTYLEARRAY");
+            style_change_record.LINESTYLEARRAY = this.getRecord("LINESTYLEARRAY");
+            style_change_record.FillBits = this.getBits(4);
+            style_change_record.LineBits = this.getBits(4);
+            fill_bits = style_change_record.FillBits;
+            line_bits = style_change_record.LineBits;
+          }
+        }
+      }
+      return record_list;
+    },
   };
   //recursive function to parse record data into a JS object
   getRecord(type, ...args){
