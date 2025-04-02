@@ -10,7 +10,8 @@ file_in.onchange = (e)=>{
     }
     READER.read(file, testBytes).then((result)=>{
       console.log(result);
-      let fp = new FLASH_PLAYER(result, new HTML_CANVAS_RENDERER(document.querySelector("canvas")));
+      let fp = new FLASH_PLAYER(result, new HTML_CANVAS_RENDERER(document.body));
+      fp.run()
       fp.test();
     }).catch((err)=>console.error(err));
     if(file.type != "application/x-shockwave-flash"){
